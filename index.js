@@ -2,45 +2,50 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const { ApolloServer } = require('apollo-server-express');
+const dotenv = require('dotenv');
 
-// Store sensitive information to env variables
-const dotnev = require('dotenv');
-dotnev.config();
+// Load environment variables
+dotenv.config();
 
-// mongoDB Atlas Connection String
+// MongoDB Atlas Connection
 const mongodb_atlas_url = process.env.MONGODB_URL;
 
-const connectDB = async() => {
+// Connect to MongoDB
+const connectDB = async () => {
     try {
-      mongoose.connect(mongodb_atlas_url, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true
-      }).then(success => {
-        console.log('Success Mongodb connection')
-      }).catch(err => {
-        console.log('Error Mongodb connection')
-      });
-    } 
-    catch(error) {
-        console.log(`Unable to connect to DB : ${error.message}`);
+        await mongoose.connect(mongodb_atlas_url, {
+            useNewUrlParser: true,
+            useUnifiedTopology: true
+        });
+        console.log('✅ MongoDB Connected Successfully');
+    } catch (error) {
+        console.error(`❌ MongoDB Connection Failed: ${error.message}`);
+        process.exit(1);
     }
-}
+};
 
-// Define Apollo Server
-const typeDefs = require('./schema');
+// Import GraphQL Schema & Resolvers
+const { typeDefs } = require('./schema');
 const resolvers = require('./resolvers');
-const server = new ApolloServer({ typeDefs, resolvers });
 
-// Define Express Server
-const app = express();
-app.use(express.json());
-app.use('*', cors());
+const startServer = async () => {
+    const app = express();
+    app.use(express.json());
+    app.use(cors());
 
-// Add Express app as middleware to Apollo Server
-server.applyMiddleware({ app, cors: false });
+    const server = new ApolloServer({ typeDefs, resolvers });
+    await server.start(); // Required before applyMiddleware()
 
-// Start listen 
-app.listen({ port: process.env.PORT }, () => {  
-  console.log(`🚀 Server ready at http://localhost:${process.env.PORT}${server.graphqlPath}`)
-  connectDB()
-});
+    server.applyMiddleware({ app, cors: false });
+
+    // Connect to MongoDB first, then start the server
+    await connectDB();
+
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => {
+        console.log(`🚀 Server ready at http://localhost:${PORT}${server.graphqlPath}`);
+    });
+};
+
+// Start the server
+startServer();
