@@ -5,14 +5,18 @@ const { ApolloServer } = require('apollo-server-express');
 const dotenv = require('dotenv');
 
 // Load environment variables
-dotenv.config();
+dotenv.config({ path: './env/.env' });
 
 // MongoDB Atlas Connection
 const mongodb_atlas_url = process.env.MONGODB_URL;
 
+// Validate MongoDB Connection
+console.log("MongoDB URL:", mongodb_atlas_url);
+
 // Connect to MongoDB
 const connectDB = async () => {
     try {
+        mongoose.set('strictQuery', true);
         await mongoose.connect(mongodb_atlas_url, {
             useNewUrlParser: true,
             useUnifiedTopology: true
@@ -29,19 +33,21 @@ const { typeDefs } = require('./schema');
 const resolvers = require('./resolvers');
 
 const startServer = async () => {
+    // Define Express Server
     const app = express();
     app.use(express.json());
-    app.use(cors());
+    app.use('*', cors());
 
-    const server = new ApolloServer({ typeDefs, resolvers });
-    await server.start(); // Required before applyMiddleware()
+    const server = new ApolloServer({ typeDefs, resolvers, context: ({ req }) => ({ req }) });
+    await server.start();
 
+    // Add Express app as middleware to Apollo Server
     server.applyMiddleware({ app, cors: false });
 
     // Connect to MongoDB first, then start the server
     await connectDB();
 
-    const PORT = process.env.PORT || 3000;
+    const PORT = process.env.PORT || 4000;
     app.listen(PORT, () => {
         console.log(`🚀 Server ready at http://localhost:${PORT}${server.graphqlPath}`);
     });
